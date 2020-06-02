@@ -1,8 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import cloudscraper
 import time, os, sys, re, json, html
 
-A_VERSION = "0.2"
+A_VERSION = "0.2.2"
 
 def pad_filename(str):
 	digits = re.compile('(\\d+)')
@@ -12,6 +12,13 @@ def pad_filename(str):
 	else:
 		return str
 
+def float_conversion(x):
+	try:
+		x = float(x)
+	except ValueError: # empty string for oneshot
+		x = 0
+	return x
+
 def zpad(num):
 	if "." in num:
 		parts = num.split('.')
@@ -19,7 +26,7 @@ def zpad(num):
 	else:
 		return num.zfill(3)
 
-def dl(manga_id, lang_code, tld):
+def dl(manga_id, lang_code, tld="org"):
 	# grab manga info json from api
 	scraper = cloudscraper.create_scraper()
 	try:
@@ -48,10 +55,11 @@ def dl(manga_id, lang_code, tld):
 	for chap in manga["chapter"]:
 		if manga["chapter"][str(chap)]["lang_code"] == lang_code:
 			chapters.append(manga["chapter"][str(chap)]["chapter"])
-	chapters.sort(key=lambda x: cvt_to_float(x)) # sort numerically by chapter #
+	chapters.sort(key=float_conversion) # sort numerically by chapter #
 
+	chapters_revised = ["Oneshot" if x == "" else x for x in chapters]
 	print("Available chapters:")
-	print(" " + ', '.join(map(str, chapters)))
+	print(" " + ', '.join(map(str, chapters_revised)))
 
 	# i/o for chapters to download
 	requested_chapters = []
@@ -108,7 +116,7 @@ def dl(manga_id, lang_code, tld):
 		# get url list
 		images = []
 		server = chapter["server"]
-		if "mangadex.org" not in server:
+		if "mangadex.{}".format(tld) not in server:
 			server = "https://mangadex.{}{}".format(tld, server)
 		hashcode = chapter["hash"]
 		for page in chapter["page_array"]:
@@ -136,14 +144,6 @@ def dl(manga_id, lang_code, tld):
 
 	print("Done!")
 
-def cvt_to_float(input):
-	try:
-		out = float(input)
-	except:
-		return 0
-	
-	return out
-
 if __name__ == "__main__":
 	print("mangadex-dl v{}".format(A_VERSION))
 
@@ -154,15 +154,13 @@ if __name__ == "__main__":
 
 	url = ""
 	while url == "":
-		url = input("Enter manga URL: ").strip()
-	manga_id = re.search("[0-9]+", url).group(0)
-	split_url = url.split("/")
-	for segment in split_url:
-		if "mangadex" in segment:
-			url = segment.split('.')
-
-	if url == None:
-		print("Error with URL")
-		
-	else:
+		url = input("Enter manga URL: ").strip().replace("www.","")
+	try:
+		manga_id = re.search("[0-9]+", url).group(0)
+		split_url = url.split("/")
+		for segment in split_url:
+			if "mangadex" in segment:
+				url = segment.split('.')
 		dl(manga_id, lang_code, url[1])
+	except:
+		print("Error with URL.")
